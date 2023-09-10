@@ -1,0 +1,245 @@
+---
+title: 'Week1 Assignment: Loading Data into a Data Frame'
+author: "Fomba Kassoh"
+date: "2023-09-08"
+output:
+  pdf_document: default
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## How Americans View Biden's Response To The Coronavirus Crisis
+
+# Overview of the article
+This article is based on polling averages compiled by the FiveThirtyEight polling organizations about President Biden's handling of the covid crisis. The conclusion of the polling results indicated that Americans approved of Biden's handling of the corona virus crises in the first year of his presidency. However, the approval was mainly among Democrats and Independents. Republicans disapproved of Biden's handling of the virus. The approval of his handling of the virus dropped over time. Below is the link to the article.
+
+Link to article:https://projects.fivethirtyeight.com/coronavirus-polls/
+link to data frame: https://raw.githubusercontent.com/hawa1983/Week1_Assignment/main/covid_approval_polls_adjusted.csv
+
+
+## Load the relevant libraries 
+We start by installing the relevant packages and loading the libraries as below
+```{r load the required libraries}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+```
+
+## Import the covid  polls data into a data frame
+Next, we import the covid polls data into a data frame: The code below reads the covid approval polls data from my github page into the covid_approval_polls data frame.
+
+```{r load the data into the data frame}
+
+covid_approval_polls <- read_csv(
+  "https://raw.githubusercontent.com/hawa1983/Week1_Assignment/main/covid_approval_polls_adjusted.csv"
+  )
+
+head(covid_approval_polls, 3)
+```
+## Preview the data
+Next, we will take a preview of the data to ensure that each variable/column is imported as the correct or desired data type.
+
+A preview of the data shows that modeldate, startdate and enddate, and timestamp variables are loaded as character data type instead of date, date, date, and datetime data types respectively. We must change these to the appropriate data types. Similarly, party, pollster, and population will be changed to factors. 
+
+```{r}
+glimpse(covid_approval_polls)
+```
+## Change data type to the correct type for each variable/column
+A preview of the updated data frame shows that changing the timestamp/column to datetime data type fill the column with NA. I will need help with this. 
+
+```{r change to appropriate data type}
+covid_approval_polls <- covid_approval_polls |>
+  mutate(
+    party = as_factor(party),
+    modeldate = as_date(modeldate, format = "%m/%d/%Y"),
+    startdate = as_date(startdate, format = "%m/%d/%Y"),
+    enddate = as_date(enddate, format = "%m/%d/%Y"),
+    pollster = as_factor(pollster),
+    population = as_factor(population),
+    timestamp = parse_character(
+      if_else(timestamp == "02:31:11 27 Nov 2022", "2022-11-27 02:31:11",
+                    if_else(timestamp == "02:31:16 27 Nov 2022", "2022-11-27 02:31:16",
+                          if_else(timestamp == "02:31:21 27 Nov 2022", "2022-11-27 02:31:21",
+                                    if_else(timestamp == "02:31:28 27 Nov 2022", "2022-11-27 02:31:28", "NA")
+                            )
+                    )
+    )),
+    timestamp = parse_character(if_else(timestamp == "02:31:11 27 Nov 2022", "2022-11-27 02:31:11", "2022-11-27 02:31:11")),
+    timestamp = as_datetime(timestamp, format = "%Y-%m-%d %H:%M:%S")
+    )
+glimpse(covid_approval_polls)
+```
+## Determine columns that have all missing values
+The preview of the data above reveals multiple missing values in the multiversions and tracking columns. Filtering the rows as shown below shows that there are 4 records where multiple versions of the raw data are combined. The tracking column has no values implying that all the polls are not tracking polls.
+
+
+```{r are there values in the multiversions column?}
+multiversions_rocords_with_values <- covid_approval_polls |>
+  filter(!is.na(multiversions))
+multiversions_rocords_with_values
+```
+
+```{r are there values in the tracking column?}
+tracking_rocords_with_values <- covid_approval_polls |>
+  filter(!is.na(tracking))
+tracking_rocords_with_values
+```
+
+## Rename some columns to make them more readable
+Rename modeldae, startdate, enddate, and samplesize columns to model_date, start_date, end_date and sample_size. 
+```{r}
+covid_approval_polls <- covid_approval_polls |> 
+  rename(
+    start_date = startdate,
+    end_date = enddate,
+    model_date = modeldate,
+    sample_size = samplesize
+  )
+
+glimpse(covid_approval_polls)
+```
+
+## Remove columns that are not relevant
+The subject, modeldate, pollster, grade, timestamp, and url columns are not relevant to our analysis. These columns will also be removed as shown below. Below is the final data frame used for our analysis. I will also remove approve and disapprove variables because I will be using the weighted versions of these variables.
+
+
+```{r multiversions, tracking, and timestamp columns/variables}
+covid_approval_polls <- covid_approval_polls |> 
+  select(
+    party, 
+    start_date, 
+    end_date, 
+    sample_size, 
+    population, 
+    weight, 
+    approve_adjusted, 
+    disapprove_adjusted
+    )
+glimpse(covid_approval_polls)
+```
+## Replace non-intuitive abbreviations
+
+The population column contain the following non-intuitive abbreviations: a = adults, rv = registered voters, lv = likely voters and v = voters. These values will be replace by adult, registered voters, likely voters, and voters respectively. The abbreviations for D for democrat, R for Republican, I for Independent will be replaced by the party names. 
+
+```{r rename row values}
+
+covid_approval_polls <- covid_approval_polls |>
+  mutate(
+    population = if_else(population == "a", "adult",
+                    if_else(population == "rv", "registered voter",
+                          if_else(population == "lv", "likely voter",
+                                    if_else(population == "v", "voter", "NA")
+                            )
+                    )
+    )
+    ,
+    party = if_else(party == "D", "Democrat",
+                    if_else(party == "R", "Republican",
+                        if_else(party == "I", "Independent", 
+                            if_else(party == "all", "All","NA")
+                      )
+              )
+        )
+    )
+
+glimpse(covid_approval_polls)
+```
+
+
+# Style and display table
+
+The code below uses the Kable package to format the table.
+```{r}
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+
+kable(covid_approval_polls, longtable = T, booktabs = T, caption = "Covid Approval Poll") |>
+  kable_styling(latex_options = c("striped", "scale_down", "repeat_header")) |> 
+  row_spec(0, background = "grey") |> 
+  landscape() |>
+  footnote(general = "This table contains a collation of polls by various polling companies. Several columns that are not relevant o the analysis have been removed.")
+```
+
+
+# Optional Exploratory Data Analysis Graphiccs
+
+## Box Plot of Biden's covid handling by political party and population
+
+Approval rating by Democrats is high but lowest among Republicans. Independents are divided.
+```{r approval rating by political party}
+ggplot(covid_approval_polls, aes(x = party, y = approve_adjusted)) + geom_boxplot() +
+  labs(title = "Biden's Covid Handling Approval by Political Party", x = "Political Party", y = "Approve")+ theme(
+  plot.title = element_text(hjust = 0.5)  # Set the horizontal justification to center (0.5)
+)
+
+```
+Disapproval rating by Republicans is high but lowest among Democrats. Independents are split but below 50 percent.
+
+```{r disapproval rating by political party}
+ggplot(covid_approval_polls, aes(x = party, y = disapprove_adjusted)) + geom_boxplot() +
+  labs(title = "Biden's Covid Handling Disapproval by Political Party", x = "Political Party", y = "Disapprove")+ theme(
+  plot.title = element_text(hjust = 0.5)  # Set the horizontal justification to center (0.5)
+)
+```
+Overall approval ratings among the voting population is high.
+
+```{r approval rating by population}
+ggplot(covid_approval_polls, aes(x = population, y = approve_adjusted)) + geom_boxplot()+
+  labs(title = "Biden's Covid Handling Approval by Population", x = "Political Party", y = "Approve")+ theme(
+  plot.title = element_text(hjust = 0.5)  # Set the horizontal justification to center (0.5)
+) 
+```
+Overall disapproval rating is relatively low.
+
+```{r disapproval rating by population}
+ggplot(covid_approval_polls, aes(x = population, y = disapprove_adjusted)) + geom_boxplot() +
+  labs(title = "Biden's Covid Handling Disapproval by Political Party", x = "Political Party", y = "Disapprove")+ theme(
+  plot.title = element_text(hjust = 0.5)  # Set the horizontal justification to center (0.5)
+) 
+```
+## Approval ratings over time
+
+The approval ratings among all political parties and population dropped over time but it remained high among democrats.
+```{r}
+ggplot(covid_approval_polls, aes(x = start_date, y = approve_adjusted, color = party)) + geom_point() +
+  labs(title = "Biden's Covid Handling Approval by Political Party", x = "Poll Date", y = "Approve")+ theme(
+  plot.title = element_text(hjust = 0.5)  # Set the horizontal justification to center (0.5)
+) 
+```
+
+```{r}
+ggplot(covid_approval_polls, aes(x = start_date, y = disapprove_adjusted, color = party)) + geom_point() + 
+  labs(title = "Biden's Covid Handling Disapproval by Political Party", x = "Poll Date", y = "Disapprove")+ theme(
+  plot.title = element_text(hjust = 0.5)  # Set the horizontal justification to center (0.5)
+) 
+```
+
+```{r}
+ggplot(covid_approval_polls, aes(x = start_date, y = approve_adjusted, color = population)) + geom_point() +
+  labs(title = "Biden's Covid Handling Approval by Political Party", x = "Poll Date", y = "Approve")+ theme(
+  plot.title = element_text(hjust = 0.5)  # Set the horizontal justification to center (0.5)
+) 
+```
+
+k
+```{r}
+ggplot(covid_approval_polls, aes(x = start_date, y = disapprove_adjusted, color = population)) + geom_point() +
+  labs(title = "Biden's Covid Handling Disapproval by Political Party", x = "Poll Date", y = "Disapprove")+ theme(
+  plot.title = element_text(hjust = 0.5)  # Set the horizontal justification to center (0.5)
+) 
+```
+## Conclusions
+
+The aggregation of the polls and the illustrated graphics shows that approval for Presidents Biden's handling of the covid pandemic was largely on party line with high approval among Democrats and low approval among Republicans and independents somewhere in between. This indicates that partisanship may have significantly influenced the approval or disapproval ratings. 
+
+## Recommendations
+
+The polls should include more data that should enable further disaggregation of the data. For example, the state or resident of the poll participants could help to highlight the opinion of the population by state or region. The pollsters should also include a weight for partisan bias when they collect information about the participants party registration. Also given that the approval/disapproval is along party lines, the pollsters should also state the proportion of the respective party members included in the article.
+
