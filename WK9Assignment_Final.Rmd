@@ -1,0 +1,66 @@
+---
+title: "WK9Assignment"
+author: "Fomba Kassoh"
+date: "2023-10-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## The 
+
+```{r}
+library(httr)
+library(jsonlite)
+library(dplyr)
+
+#My API key.
+api_key <- "ABdgPNF8HPZt2yGi7nAr6dhUUE5OxYxp"
+
+# query parameters.
+query_params <- list(
+  q = "transportation",
+  fq = "source:('The New York Times')",
+  begin_date = "20231001", # Start date
+  end_date = "20231105",   # End date
+  sort = "newest"         # Sorting order
+  
+)
+
+# URL for the Article Search API.
+base_url <- paste0("https://api.nytimes.com/svc/search/v2/articlesearch.json?query_params&api-key=", api_key)
+
+response <- GET(base_url)
+if (http_type(response) == "application/json") {
+  response_text <- content(response, "text", encoding = "UTF-8")
+  data <- jsonlite::fromJSON(response_text)
+  if ("response" %in% names(data) && "docs" %in% names(data$response)) {
+    extracted_data <- data$response$docs
+  } else {
+    stop("Response JSON structure is not as expected")
+  }
+} else {
+  stop("Invalid response content type. Expected 'application/json'.")
+}
+
+#persist the json file. This will be uploaded to GitHub
+json_file <- "nytimes_articles.json"
+write_json(data, json_file)
+
+#read the json file into a data frame
+gitJson <-"https://raw.githubusercontent.com/hawa1983/WK9Homework/main/nytimes_articles.json"
+nytimes_articles <- fromJSON(gitJson, flatten = TRUE)
+nytimes_articles
+```
+
+
+
+```{r, results='asis'}
+library(knitr)
+kable(nytimes_articles)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
